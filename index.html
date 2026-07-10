@@ -3,154 +3,290 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Рандонавтика - Тайгана</title>
+    <title>тайгана</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            background-color: #f4f4f9;
-            margin: 0;
-            padding: 20px;
-        }
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        #map {
-            width: 100%;
-            height: 300px;
-            background-color: #e0e0e0;
-            margin-top: 20px;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #666;
-        }
-        button {
-            padding: 15px 30px;
-            font-size: 18px;
-            background-color: #2e7d32;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: 0.2s;
-        }
-        button:hover {
-            background-color: #1b5e20;
-        }
-        #place-info {
-            margin-top: 20px;
-            text-align: left;
-        }
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #f4f4f9; margin: 0; padding: 20px; overflow-x: hidden; }
+        
+        #map { width: 100%; max-width: 800px; height: 450px; margin: 20px auto; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); z-index: 1; }
+        button { padding: 15px 30px; font-size: 18px; background-color: #2e7d32; color: white; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: 0.2s; position: relative; z-index: 2; margin-top: 15px; }
+        button:hover { background-color: #1b5e20; transform: scale(1.02); }
+        button:disabled { background-color: #888; cursor: not-allowed; transform: none; }
+        
+        #place-info { max-width: 600px; margin: 20px auto; text-align: left; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: none; }
+        
+        /* Стили для панели фильтров */
+        .controls { max-width: 600px; margin: 15px auto; background: #fff; padding: 15px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); text-align: left; position: relative; z-index: 2; }
+        .control-group { margin-bottom: 10px; }
+        .control-group label { font-weight: bold; margin-right: 10px; color: #333; }
+        select { padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; }
+        
+        #geo-status { font-size: 13px; color: #e65100; font-weight: bold; margin-top: 10px; text-align: center; }
+
+        /* Двери лифта */
+        .elevator-door { position: fixed; top: 0; width: 50vw; height: 100vh; z-index: 9998; transition: transform 0.8s ease-in-out; box-shadow: 0 0 20px rgba(0,0,0,0.5); background-size: cover; background-position: center; background-repeat: no-repeat; }
+        #left-door { left: 0; transform: translateX(-100%); border-right: 2px solid #1f232b; background-image: url('left.jpg'); }
+        #right-door { right: 0; transform: translateX(100%); border-left: 2px solid #1f232b; background-image: url('right.jpg'); }
+        .elevator-door.closed { transform: translateX(0) !important; }
+
+        /* Окно блокировки */
+        #pro-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(5px); z-index: 10000; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; visibility: hidden; opacity: 0; transition: opacity 0.3s; }
+        #pro-overlay.active { visibility: visible; opacity: 1; }
+        .pro-box { position: relative; background: #1f232b; padding: 40px; border-radius: 15px; text-align: center; border: 2px solid #ff9800; max-width: 400px; width: 90%; }
+        .close-btn { position: absolute; top: 15px; right: 20px; font-size: 28px; color: #888; cursor: pointer; }
+        .close-btn:hover { color: #fff; }
+        .pro-box h2 { color: #ff9800; margin-top: 0; }
+        .timer { font-size: 32px; font-weight: bold; margin: 20px 0; }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <h1>Тайгана</h1>
-        <p>Нажми на кнопку, чтобы получить геолокацию скрытого памятника</p>
-        
-        <button id="random-btn">Найти памятник</button>
+    <div id="left-door" class="elevator-door"></div>
+    <div id="right-door" class="elevator-door"></div>
 
-        <div id="place-info"></div>
-        
-        <div id="map">Здесь будет интерактивная карта</div>
+    <div id="pro-overlay">
+        <div class="pro-box">
+            <span class="close-btn" id="close-btn">&times;</span>
+            <h2>Оформите PRO подписку</h2>
+            <p>Вы ищете слишком часто!</p>
+            <div class="timer" id="countdown">00:30</div>
+            <p style="color: #aaa; font-size: 14px;">Подождите, чтобы продолжить бесплатно.</p>
+        </div>
     </div>
 
+    <h1>тайгана</h1>
+    
+    <div class="controls">
+        <div class="control-group">
+            <label for="radius-select">Радиус поиска:</label>
+
+
+
+<select id="radius-select">
+                <option value="1000">1 км</option>
+                <option value="3000">3 км</option>
+                <option value="5000" selected>5 км</option>
+            </select>
+        </div>
+        
+        <div class="control-group">
+            <label for="type-select">Тип локации:</label>
+            <select id="type-select">
+                <option value="all">Все места</option>
+                <option value="urban">Городские (Дворы, стрит-арт, заброшки)</option>
+                <option value="forest">Лесные (Тропы, дикие парки)</option>
+            </select>
+        </div>
+        
+        <div id="geo-status">⏳ Запрашиваем GPS...</div>
+    </div>
+
+    <button id="random-btn" disabled>Найти локацию</button>
+
+    <div id="place-info"></div>
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // 1. База данных памятников
+        // Обновленная база данных: малоизвестные, скрытые и нетипичные места Екатеринбурга
         const monuments = [
-            {
-                name: "Дидинский тоннель",
-                description: "Заброшенный дореволюционный ж/д тоннель длиной более 1 км. Внутри круглый год лежит лед, а атмосфера напоминает мистический триллер",
-                hint: "Ищите старый бетонный портал в густом лесу недалеко от ж/д перегона Дидино. Возьмите мощный фонарь и сапоги!",
-                lat: 56.818624,
-                lng: 59.696919
-            },
-            {
-                name: "Уральский Марс",
-                description: "Действующий карьер по добыче огнеупорной глины. Из-за минералов земля здесь окрашена в багровые, оранжевые и черные тона, создавая полное ощущение другой планеты",
-                hint: "Находится под Богдановичем. Ищите глазами огромные растрескавшиеся холмы и озера с багровой водой.",
-                lat: 56.619962,
-                lng: 62.089018
-            },
-            {
-                name: "Кыштымский Бали",
-                description: "Заброшенный каолиновый карьер с лазурно-бирюзовой водой и белоснежными глиняными берегами, напоминающий тропический курорт. Купаться тут нельзя, но фото получаются космические",
-                hint: "Двигайтесь по грунтовой дороге от окраины Кыштыма. Ориентир — ослепительно белые насыпи за деревьями.",
-                lat: 55.677500,
-                lng: 60.597500
-            },
-            {
-                name: "Порог Ревун",
-                description: "Единственный на среднем Урале бурный горный порог на равнинной реке Исеть. Весной здесь кипит вода, а вокруг высятся отвесные скалы",
-                hint: "Ищите шум бушующей воды за деревьями сразу на выезде из деревни Бекленищева.",
-                lat: 56.433833,
-                lng: 61.602583
-            },
-            {
-                name: "Аракульский Шихан",
-                description: "Величественная гранитная стена посреди леса, созданная выветриванием за миллионы лет. С вершины открывается вид на 11 озер Южного Урала",
-                hint: "От озера Аракуль идите вверх по старой крутой тропе через сосновый бор, пока не упретесь в скалы",
-                lat: 55.981667,
-                lng: 60.493611
-            },
-            {
-                name: "Старая Губаха",
-                description: "Город-призрак в Пермском крае. Заброшенный шахтерский поселок, который постепенно поглощает тайга. Сохранились остовы зданий советской архитектуры",
-                hint: "Перейдите через подвесной мост над рекой Косьва и двигайтесь по заросшим улицам бывших кварталов",
-                lat: 58.871886,
-                lng: 57.601864
-            },
-            {
-                name: "Большая Каменная река",
-                description: "Хаотичное нагромождение огромных авантюриновых валунов длиной более 6 км в нацпарке Таганай. Камни буквально «текут» между горными хребтами",
-                hint: "Идите по Нижней тропе парка Таганай. Вы поймете, что на месте, когда лес резко оборвется морем камней",
-                lat: 55.245717,
-                lng: 59.773408
-            },
-            {
-                name: "Святлище Большие Аллаки",
-                description: "Древнее языческое святилище, которому более 7 тысяч лет. Посреди степи у озера одиноко стоят 14 огромных гранитных скал («каменных палаток»). Археологи нашли здесь наскальные рисунки древних людей и следы жертвоприношений",
-                hint: "Двигайтесь к южному берегу озера Большие Аллаки (Челябинская область). Скалы стоят группой прямо в поле. Обойдите их кругом и всмотритесь в ниши — там сохранились рисунки первобытных людей, сделанные охрой",
-                lat: 55.958556,
-                lng: 60.921389
-            },
-            {
-                name: "Усьвинские Столбы и Чёртов Палец",
-                description: "Величественная каменная стена высотой 120 метров, растянувшаяся вдоль реки. Самая культовая точка — скала «Чёртов Палец», которая чудом держится на тонкой «ножке». Здесь снимали фильм «Географ глобус пропил»",
-                hint: "От поселка Усьва в Пермском крае идите пешком вдоль реки около 5 км, а затем поднимайтесь по крутой тропе на самую вершину. Осторожнее на краю смотровой площадки — вид на «Палец» там захватывает дух",
-                lat: 58.654322,
-                lng: 57.643356
-            }
+            // Городские
+            { name: "Памятник Человеку-невидимке", type: "urban", description: "Крошечный памятник в виде отпечатков ног на бронзовой плите.", hint: "Ищи у библиотеки Белинского, смотри под ноги.", lat: 56.8336, lng: 60.6133 },
+            { name: "Памятник Банковской карте", type: "urban", description: "Огромный барельеф в виде банковской карты на стене.", hint: "Перекресток Малышева и Банковского переулка.", lat: 56.8335, lng: 60.5995 },
+            { name: "Старая Ольховская плотина", type: "urban", description: "Архитектурный памятник XIX века, спрятанный в глубине района.", hint: "Река Ольховка, недалеко от УрГУПС.", lat: 56.8576, lng: 60.5831 },
+            { name: "Заброшенная гостиница «Мадрид»", type: "urban", description: "Мрачное, но красивое пустующее здание сталинского ампира.", hint: "Площадь Первой Пятилетки на Уралмаше.", lat: 56.8885, lng: 60.5962 },
+            { name: "Дворик в Городке Чекистов", type: "urban", description: "Атмосферные конструктивистские дворы и винтовые лестницы.", hint: "Зайди в арки жилого комплекса на Ленина 52.", lat: 56.8412, lng: 60.6225 },
+            { name: "Памятник Тёрке", type: "urban", description: "Огромная металлическая терка весом 15 килограммов.", hint: "Ищи на улице Малышева, висит в воздухе.", lat: 56.8330, lng: 60.6120 },
+            { name: "Скульптура «Любопытство»", type: "urban", description: "Забавный памятник человеку, подглядывающему в замочную скважину.", hint: "Улица Студенческая, у одного из зданий.", lat: 56.8440, lng: 60.6530 },
+            { name: "Музей этикетки", type: "urban", description: "Крошечный частный музей с огромной коллекцией старых фантиков и этикеток.", hint: "В здании типографии на востоке центра.", lat: 56.8290, lng: 60.6200 },
+            
+            // Лесные/Парковые
+            { name: "Скала Каменная чаша", type: "forest", description: "Дикие скальные останцы, спрятанные в лесопарке Уктус.", hint: "Южная часть лесопарка Уктус, вдали от лыжных трасс.", lat: 56.7750, lng: 60.6450 },
+            { name: "Метеогорка (задние тропы)", type: "forest", description: "Малоизвестные дикие тропинки за старой обсерваторией.", hint: "Поднимись на Метеогорку и иди за здание станции.", lat: 56.8235, lng: 60.6265 },
+            { name: "Парк имени 50-летия ВЛКСМ", type: "forest", description: "В народе — 'Собачий парк'. Множество тропинок и водоемов.", hint: "Ориентир — улица Ясная.", lat: 56.8155, lng: 60.5845 },
+            { name: "Озеро Чёрная Галя", type: "forest", description: "Небольшое затерянное торфяное озеро в лесах Уралмаша.", hint: "Глубоко в парке Победы, на север.", lat: 56.9110, lng: 60.5650 },
+            { name: "Калиновские разрезы", type: "forest", description: "Бывшие золотодобывающие прииски, ставшие лесными прудами.", hint: "Окраина Эльмаша, у Калиновского лесопарка.", lat: 56.9050, lng: 60.6350 },
+{ name: "Тропа имени Кузнецова", type: "forest", description: "Дикая тропа вдоль ВИЗовского пруда с видом на острова.", hint: "Начни путь от Малоконного полуострова.", lat: 56.8290, lng: 60.5360 },
+            { name: "Родник «Память»", type: "forest", description: "Спрятанный в лесу облагороженный родник на берегу Шарташа.", hint: "Северный берег озера Шарташ, вглубь леса.", lat: 56.8450, lng: 60.6750 }
         ];
 
-        // 2. Находим элементы на странице
+        let availableMonuments = [...monuments];
+        
+        // Карта с отключенным префиксом (чтобы убрать флаг Украины)
+        const map = L.map('map', { attributionControl: false }).setView([56.84, 60.65], 11);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        L.control.attribution({ prefix: false }).addAttribution('&copy; OpenStreetMap').addTo(map);
+
+        let currentMarker = null;
+        let userMarker = null;
+
         const button = document.getElementById('random-btn');
         const infoDiv = document.getElementById('place-info');
+        const geoStatus = document.getElementById('geo-status');
+        
+        let userLat = null;
+        let userLng = null;
 
-        // 3. Отслеживаем нажатие на кнопку
+        // --- ГЕОЛОКАЦИЯ (РЕАЛЬНАЯ, КАЖДЫЕ 15 СЕКУНД) ---
+        function updateLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        userLat = position.coords.latitude;
+                        userLng = position.coords.longitude;
+                        
+                        // Меняем статус и разблокируем кнопку
+                        geoStatus.textContent = "✅ Геопозиция найдена (обновляется...)";
+                        geoStatus.style.color = "#2e7d32";
+                        button.disabled = false;
+                        
+                        drawUserMarker();
+                    },
+                    (error) => {
+                        geoStatus.textContent = "❌ Ошибка GPS. Разрешите доступ к геопозиции.";
+                        geoStatus.style.color = "red";
+                        button.disabled = true;
+                    },
+                    { enableHighAccuracy: true, maximumAge: 10000 }
+                );
+            } else {
+                geoStatus.textContent = "❌ Ваш браузер не поддерживает геолокацию.";
+            }
+        }
+
+        function drawUserMarker() {
+            if (userMarker) {
+                // Если маркер уже есть, просто плавно двигаем его (карта при этом не дергается)
+                userMarker.setLatLng([userLat, userLng]);
+            } else {
+                // При первом запуске создаем маркер и центрируем карту
+                const redIcon = L.icon({
+                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+                    iconSize: [25, 41], iconAnchor: [12, 41]
+                });
+                userMarker = L.marker([userLat, userLng], {icon: redIcon}).addTo(map).bindPopup("<b>Вы здесь</b>");
+                map.setView([userLat, userLng], 12);
+            }
+        }
+
+        // Запускаем сразу и потом каждые 15 секунд
+        updateLocation();
+        setInterval(updateLocation, 15000);
+
+        // --- ЛОГИКА ТАЙМЕРА (30 сек) ---
+        const proOverlay = document.getElementById('pro-overlay');
+        const countdownElement = document.getElementById('countdown');
+        const closeBtn = document.getElementById('close-btn');
+        const COOLDOWN_TIME = 30 * 1000; 
+        let timerInterval;
+
+        function getRemainingTime() {
+            const lastClick = localStorage.getItem('lastClickTime');
+            if (!lastClick) return 0;
+            return COOLDOWN_TIME - (Date.now() - parseInt(lastClick, 10));
+        }
+
+        function updateTimerDisplay(ms) {
+            let seconds = Math.floor((ms % 60000) / 1000);
+            countdownElement.innerHTML = `00:${seconds < 10 ? "0" + seconds : seconds}`;
+        }
+function showProModal(remainingTime) {
+            proOverlay.classList.add('active');
+            updateTimerDisplay(remainingTime);
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                const currentRemaining = getRemainingTime();
+                if (currentRemaining <= 0) {
+                    clearInterval(timerInterval);
+                    proOverlay.classList.remove('active');
+                } else {
+                    updateTimerDisplay(currentRemaining);
+                }
+            }, 1000);
+        }
+
+        closeBtn.addEventListener('click', () => {
+            proOverlay.classList.remove('active');
+            clearInterval(timerInterval);
+        });
+
+        // --- ЛОГИКА ПОИСКА ---
         button.addEventListener('click', () => {
-            // Выбираем случайный памятник
-            const randomIndex = Math.floor(Math.random() * monuments.length);
-            const randomPlace = monuments[randomIndex];
+            if (userLat === null) {
+                alert("Дождитесь определения геопозиции!");
+                return;
+            }
 
-            // Вставляем текст на страницу
-            infoDiv.innerHTML = `
-                <h2 style="color: #2e7d32; margin-bottom: 10px;">${randomPlace.name}</h2>
-                <p><strong>Описание:</strong> ${randomPlace.description}</p>
-                <div style="background: #e8f5e9; padding: 15px; border-left: 5px solid #2e7d32; border-radius: 4px; margin: 10px 0;">
-                    <strong>Подсказка по поиску:</strong> ${randomPlace.hint}
-                </div>
-                <p style="color: #666;"><small>GPS Координаты: ${randomPlace.lat}, ${randomPlace.lng}</small></p>
-            `;
+            const remaining = getRemainingTime();
+            if (remaining > 0) {
+                showProModal(remaining);
+                return;
+            }
+
+            const selectedRadius = parseInt(document.getElementById('radius-select').value);
+            const selectedType = document.getElementById('type-select').value;
+
+            // ФИЛЬТРУЕМ ТОЧКИ
+            let filteredPlaces = availableMonuments.filter(place => {
+                const isTypeMatch = (selectedType === 'all' || place.type === selectedType);
+                const distanceToPlace = map.distance([userLat, userLng], [place.lat, place.lng]);
+                const isDistMatch = distanceToPlace <= selectedRadius;
+                return isTypeMatch && isDistMatch;
+            });
+
+            // Если ничего не найдено
+            if (filteredPlaces.length === 0) {
+                alert("В выбранном радиусе с такими фильтрами ничего нет! Увеличь радиус или смени тип локации.");
+                const allFiltered = monuments.filter(place => (selectedType === 'all' || place.type === selectedType) && map.distance([userLat, userLng], [place.lat, place.lng]) <= selectedRadius);
+                if(allFiltered.length > 0) {
+                    alert("Вы уже открыли все точки в этом радиусе! Начинаем поиск по второму кругу.");
+                    availableMonuments = [...monuments];
+                }
+                return;
+            }
+
+            // Записываем клик в память
+            localStorage.setItem('lastClickTime', Date.now().toString());
+
+            // Анимация лифта
+            document.getElementById('left-door').classList.add('closed');
+            document.getElementById('right-door').classList.add('closed');
+
+            setTimeout(() => {
+                const randomIndex = Math.floor(Math.random() * filteredPlaces.length);
+                const randomPlace = filteredPlaces[randomIndex];
+                
+                const globalIndex = availableMonuments.findIndex(m => m.name === randomPlace.name);
+                if (globalIndex > -1) availableMonuments.splice(globalIndex, 1);
+                
+                const distanceInKm = (map.distance([userLat, userLng], [randomPlace.lat, randomPlace.lng]) / 1000).toFixed(1);
+
+                infoDiv.style.display = 'block';
+                infoDiv.innerHTML = `
+                    <h2 style="color: #2e7d32; margin-top: 0;">${randomPlace.name}</h2>
+                    <p><strong>Описание:</strong> ${randomPlace.description}</p>
+                    <p><strong>Тип:</strong> ${randomPlace.type === 'urban' ? '🏙️  Городская' : '🌲  Лесная/Парковая'}</p>
+                    <p><strong>Расстояние до вас:</strong> ~${distanceInKm} км</p>
+                    <p style="background: #e8f5e9; padding: 12px; border-left: 5px solid #2e7d32; margin-bottom: 0;">
+                        <strong>Подсказка:</strong> ${randomPlace.hint}
+                    </p>
+                `;
+
+                if (currentMarker) map.removeLayer(currentMarker);
+currentMarker = L.marker([randomPlace.lat, randomPlace.lng]).addTo(map);
+                
+                // Центрируем карту
+                const group = new L.featureGroup([userMarker, currentMarker]);
+                map.fitBounds(group.getBounds(), { padding: [50, 50] });
+
+                setTimeout(() => {
+                    document.getElementById('left-door').classList.remove('closed');
+                    document.getElementById('right-door').classList.remove('closed');
+                }, 500);
+
+            }, 800);
         });
     </script>
 </body>
